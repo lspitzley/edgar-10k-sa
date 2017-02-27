@@ -2,10 +2,11 @@ import argparse
 import csv
 from collections import namedtuple
 from itertools import product
+#from multiprocessing import cpu_count, Pool, Process, Queue
 import os
 import requests
 
-from tqdm import tqdm
+from pathos.pools import ProcessPool
 
 SEC_GOV_URL = 'http://www.sec.gov/Archives'
 FORM_INDEX_URL = os.path.join(SEC_GOV_URL,'edgar','full-index','{}','QTR{}','form.idx')
@@ -81,27 +82,44 @@ class FormIndex(object):
         print("Saving records to {}".format(path))
 
         with open(path,'w') as fout:
-            writer = csv.writer(fout)
+            writer = csv.writer(fout,delimiter=',',quotechar='\"',quoting=csv.QUOTE_ALL)
             for rec in self.formrecords:
                 writer.writerow( tuple(rec) )
 
 class Form(object):
     def __init__(self):
-        pass
+        # Initialize cache directory
+        if not os.path.exists('./cache'):
+            os.makedirs("./cache/")
 
     def download(self, form10k_savepath):
 
-        with open(form10k_savepath,'r') as fin:
-            reader = csv.reader(fin, delimiter=',')
-            for row in reader:
-                form_type, company_name, cik, date_filed, filename = row
+        def iter_path(form10k_savepath):
+            with open(form10k_savepath,'r') as fin:
+                reader = csv.reader(fin,delimiter=',',quotechar='\"',quoting=csv.QUOTE_ALL)
+                for row in reader:
+                    if len(row) != 5:
+                        print(row)
+                    form_type, company_name, cik, date_filed, filename = row
+                    url = os.path.join(SEC_GOV_URL,filename)
+                    yield url
 
-                url = os.path.join(SEC_GOV_URL,filename)
+        def download_job(url):
+            if os.path.exists(url):
+                print("Already exists, skipping {}".format(url))
+            else:
+                print("Downloading {}".format(url))
 
                 r = requests.get(url)
 
+                fname = url.split('/')[-1]
+                formpath = os.path.join('.','cache',fname)
 
+                with open(formpath,'wb') as fout:
+                    fout.write(r.content)
 
+        pool = ProcessPool(4)
+        pool.map(download_job, iter_path(form10k_savepath))
 
 def main():
     # Download form index
@@ -123,7 +141,6 @@ def main():
     else:
         print("{} already exists".format(form10k_savepath))
 
-
     # Download 10k forms and extract MD&A
     try:
         os.makedirs('./mda')
@@ -131,7 +148,7 @@ def main():
         pass
 
     form = Form()
-
+    form.download(form10k_savepath)
 
 
 if __name__ == "__main__":
