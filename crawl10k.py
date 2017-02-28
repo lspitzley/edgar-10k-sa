@@ -2,11 +2,11 @@ import argparse
 import csv
 from collections import namedtuple
 from itertools import product
-#from multiprocessing import cpu_count, Pool, Process, Queue
 import os
-import requests
 
 from pathos.pools import ProcessPool
+from pathos.helpers import cpu_count
+import requests
 
 SEC_GOV_URL = 'http://www.sec.gov/Archives'
 FORM_INDEX_URL = os.path.join(SEC_GOV_URL,'edgar','full-index','{}','QTR{}','form.idx')
@@ -94,7 +94,7 @@ class Form(object):
 
     def download(self, form10k_savepath):
 
-        def iter_path(form10k_savepath):
+        def iter_path_generator(form10k_savepath):
             with open(form10k_savepath,'r') as fin:
                 reader = csv.reader(fin,delimiter=',',quotechar='\"',quoting=csv.QUOTE_ALL)
                 for row in reader:
@@ -105,21 +105,23 @@ class Form(object):
                     yield url
 
         def download_job(url):
-            if os.path.exists(url):
+
+            fname = url.split('/')[-1]
+            formpath = os.path.join('.','cache',fname)
+
+            if os.path.exists(formpath):
                 print("Already exists, skipping {}".format(url))
             else:
                 print("Downloading {}".format(url))
 
                 r = requests.get(url)
 
-                fname = url.split('/')[-1]
-                formpath = os.path.join('.','cache',fname)
-
                 with open(formpath,'wb') as fout:
                     fout.write(r.content)
 
-        pool = ProcessPool(4)
-        pool.map(download_job, iter_path(form10k_savepath))
+        ncpus = cpu_count()
+        pool = ProcessPool( ncpus )
+        pool.map(download_job, iter_path_generator(form10k_savepath))
 
 def main():
     # Download form index
