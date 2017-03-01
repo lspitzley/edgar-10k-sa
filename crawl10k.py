@@ -105,8 +105,8 @@ class Form(object):
                     yield url
 
         def download_job(url):
+            fname = '_'.join(url.split('/')[-2:])
 
-            fname = url.split('/')[-1]
             formpath = os.path.join(self.form_dir,fname)
 
             if os.path.exists(formpath):
@@ -127,12 +127,10 @@ class MDAParser(object):
     def __init__(self, directory):
         self.directory = directory
 
-
-
 def main():
     # Download form index
     parser = argparse.ArgumentParser("Edgar 10k forms sentiment analysis")
-    parser.add_argument('--year_start',type=int,default=1993)
+    parser.add_argument('--year_start',type=int,default=2014)
     parser.add_argument('--year_end',type=int,default=2016)
     parser.add_argument('--index_dir',type=str,default='./index')
     parser.add_argument('--form_dir',type=str,default='./form')
@@ -150,7 +148,7 @@ def main():
     form10k_savepath = "year{}-{}.10k.csv".format(year_start,year_end)
 
     if not os.path.exists(form10k_savepath):
-        formindex = FormIndex(index_dir)
+        formindex = FormIndex(index_dir=index_dir)
         for year, qtr in product(range(args.year_start,args.year_end+1),range(1,5)):
             formindex.retrieve(year, qtr)
         formindex.save(form10k_savepath)
@@ -158,8 +156,8 @@ def main():
         print("{} already exists".format(form10k_savepath))
 
     # Download 10k forms raw data
-    form = Form(form_dir)
-    form.download(form10k_savepath)
+    form = Form(form_dir=form_dir)
+    form.download(form10k_savepath=form10k_savepath)
 
     # Extract MD&A
 
