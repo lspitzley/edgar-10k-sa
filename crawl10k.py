@@ -120,7 +120,8 @@ class Form(object):
                     fout.write(r.content)
 
         ncpus = cpu_count()
-        pool = ProcessPool( ncpus )
+        #pool = ProcessPool( ncpus )
+        pool = ProcessPool( 8 )
         pool.map( download_job, iter_path_generator(form10k_savepath) )
 
 class MDAParser(object):
