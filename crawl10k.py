@@ -1,12 +1,17 @@
 import argparse
+import asyncio
 import csv
 from collections import namedtuple
+from glob import glob
 from itertools import product
 import os
 
+from bs4 import BeautifulSoup
 from pathos.pools import ProcessPool
 from pathos.helpers import cpu_count
 import requests
+from tqdm import tqdm
+
 
 SEC_GOV_URL = 'http://www.sec.gov/Archives'
 FORM_INDEX_URL = os.path.join(SEC_GOV_URL,'edgar','full-index','{}','QTR{}','form.idx')
@@ -125,8 +130,52 @@ class Form(object):
         pool.map( download_job, iter_path_generator(form10k_savepath) )
 
 class MDAParser(object):
-    def __init__(self, directory):
-        self.directory = directory
+    def __init__(self, mda_dir):
+        self.mda_dir = mda_dir
+
+    def extract_from(self, form_dir):
+
+        for fname in os.listdir(form_dir):
+
+            filepath = os.path.join(form_dir,fname)
+
+            with open(filepath,'rb') as fin:
+                markup = fin.read()
+
+            parsed_mda = self.parse(markup)
+
+            name, ext = os.path.splitext(fname)
+
+            mdafname = name + '.mda'
+
+            mdapath = os.path.join(self.mda_dir,mdafname)
+
+            with open(mdapath,'w') as fout:
+                fout.write(parsed_mda)
+
+    def parse(self, markup):
+        mda_lines = []
+
+        first = False
+        ismda = False
+
+        soup = BeautifulSoup(markup,'html.parser')
+        text = soup.get_text('\n', strip=True)
+
+        text = text.replace(u'\xa0', u' ')
+
+        for line in text.split('\n'):
+
+            if ismda and line.startswith('Item'):
+                break
+
+            if line == "Item 7. Management’s Discussion and Analysis of Financial Condition and Results of Operations":
+                ismda = True
+
+            if ismda:
+                mda_lines.append(line)
+
+        return '\n'.join(mda_lines)
 
 def main():
     # Download form index
@@ -161,9 +210,8 @@ def main():
     form.download(form10k_savepath=form10k_savepath)
 
     # Extract MD&A
-
-    MDAParser(directory='./mda')
-
+    parser = MDAParser(mda_dir=mda_dir)
+    parser.extract_from(form_dir=form_dir)
 
 if __name__ == "__main__":
     main()
