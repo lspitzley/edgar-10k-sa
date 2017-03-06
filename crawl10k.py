@@ -1,5 +1,4 @@
 import argparse
-import asyncio
 import csv
 from collections import namedtuple
 from glob import glob
@@ -132,10 +131,11 @@ class Form(object):
 class MDAParser(object):
     def __init__(self, mda_dir):
         self.mda_dir = mda_dir
-
+	if not os.path.exists(mda_dir):
+	    os.makedirs(mda_dir)
     def extract_from(self, form_dir):
 
-        for fname in os.listdir(form_dir):
+        for fname in tqdm(os.listdir(form_dir)):
 
             filepath = os.path.join(form_dir,fname)
 
@@ -159,17 +159,17 @@ class MDAParser(object):
         first = False
         ismda = False
 
-        soup = BeautifulSoup(markup,'html.parser')
+        soup = BeautifulSoup(markup,'lxml')
         text = soup.get_text('\n', strip=True)
 
-        text = text.replace(u'\xa0', u' ')
+        text = text.replace(u'\xa0', u' ').replace('&nbsp;',' ')
 
         for line in text.split('\n'):
 
             if ismda and line.startswith('Item'):
                 break
 
-            if line == "Item 7. Management’s Discussion and Analysis of Financial Condition and Results of Operations":
+	    if line == "Item 7. Management's Discussion and Analysis of Financial Condition and Results of Operations":
                 ismda = True
 
             if ismda:
@@ -206,8 +206,8 @@ def main():
         print("{} already exists".format(form10k_savepath))
 
     # Download 10k forms raw data
-    form = Form(form_dir=form_dir)
-    form.download(form10k_savepath=form10k_savepath)
+    #form = Form(form_dir=form_dir)
+    #form.download(form10k_savepath=form10k_savepath)
 
     # Extract MD&A
     parser = MDAParser(mda_dir=mda_dir)
