@@ -17,6 +17,8 @@ FORM_INDEX_URL = os.path.join(SEC_GOV_URL,'edgar','full-index','{}','QTR{}','for
 
 IndexRecord = namedtuple("IndexRecord",["form_type","company_name","cik","date_filed","filename"])
 
+invalid_spaces = [u'\xa0',u'&nbsp;']
+
 class FormIndex(object):
     def __init__(self, index_dir):
         self.formrecords = []
@@ -130,9 +132,18 @@ class Form(object):
 
 class MDAParser(object):
     def __init__(self, mda_dir):
-        self.mda_dir = mda_dir
+        self.mda_dir    = mda_dir
         if not os.path.exists(mda_dir):
             os.makedirs(mda_dir)
+
+        self.empty_mdas = []
+
+    def __del__(self):
+        emptymda_paths = 'failed2parse.txt'
+        print("Writing failed to parse files to {}".foramt(emptymda_paths))
+        with open(emptymda_paths,'w') as fout:
+            for line in self.empty_mdas:
+                fout.write(line + '\n')
 
     def extract_from(self, form_dir):
 
@@ -145,38 +156,35 @@ class MDAParser(object):
 
             parsed_mda = self.parse(markup)
 
+            # Get save file path for mda
             name, ext = os.path.splitext(fname)
 
             mdafname = name + '.mda'
 
             mdapath = os.path.join(self.mda_dir,mdafname)
 
-            with open(mdapath,'w') as fout:
-                fout.write(parsed_mda)
+            if not parsed_mda:
+                print("Empty mda: {}".format(mdapath))
+                self.empty_mdas.append(filepath)
+            else:
+                with open(mdapath,'w') as fout:
+                    fout.write(parsed_mda)
 
     def parse(self, markup):
-        mda_lines = []
+        parsed_mda = ""
 
-        first = False
-        ismda = False
-
-        soup = BeautifulSoup(markup,'lxml')
+        soup = BeautifulSoup(markup,'html.parser')
         text = soup.get_text('\n', strip=True)
 
-        text = text.replace(u'\xa0', u' ').replace('&nbsp;',' ')
+        text = text.replace(u'\xa0', u' ').replace(u'&nbsp;',u' ')
 
-        for line in text.split('\n'):
+        begin = text.find('Table of Contents\nItem 7.')
+        end   = text.find('Table of Contents\nItem 7A.',begin)
 
-            if ismda and line.startswith('Item'):
-                break
+        if end > begin:
+            parsed_mda = text[begin:end];
 
-	    if line == "Item 7. Management's Discussion and Analysis of Financial Condition and Results of Operations":
-                ismda = True
-
-            if ismda:
-                mda_lines.append(line)
-
-        return '\n'.join(mda_lines)
+        return parsed_mda
 
 def main():
     # Download form index
@@ -207,8 +215,8 @@ def main():
         print("{} already exists".format(form10k_savepath))
 
     # Download 10k forms raw data
-    #form = Form(form_dir=form_dir)
-    #form.download(form10k_savepath=form10k_savepath)
+    form = Form(form_dir=form_dir)
+    form.download(form10k_savepath=form10k_savepath)
 
     # Extract MD&A
     parser = MDAParser(mda_dir=mda_dir)
