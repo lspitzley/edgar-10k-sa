@@ -131,6 +131,8 @@ class Form(object):
 class MDAParser(object):
     def __init__(self, mda_dir):
         self.mda_dir = mda_dir
+        if not os.path.exists(mda_dir):
+            os.makedirs(mda_dir)
 
     def extract_from(self, form_dir):
 
