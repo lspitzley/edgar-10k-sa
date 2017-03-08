@@ -113,6 +113,9 @@ class Form(object):
         def download_job(url):
             fname = '_'.join(url.split('/')[-2:])
 
+            fname, ext = os.path.splitext(fname)
+            fname = fname + '.html'
+
             formpath = os.path.join(self.form_dir,fname)
 
             if os.path.exists(formpath):
@@ -140,21 +143,27 @@ class MDAParser(object):
 
     def __del__(self):
         emptymda_paths = 'failed2parse.txt'
-        print("Writing failed to parse files to {}".foramt(emptymda_paths))
+        print("Writing failed to parse files to {}".format(emptymda_paths))
+
         with open(emptymda_paths,'w') as fout:
             for line in self.empty_mdas:
                 fout.write(line + '\n')
 
     def extract_from(self, form_dir):
 
-        for fname in tqdm(os.listdir(form_dir)):
+        for fname in os.listdir(form_dir):
+            if fname.endswith('.txt'):
+                pass
 
             filepath = os.path.join(form_dir,fname)
+            print("Parsing: {}".format(filepath))
 
             with open(filepath,'rb') as fin:
                 markup = fin.read()
 
-            parsed_mda = self.parse(markup)
+            html_name, ext = os.path.splitext(filepath)
+
+            parsed_mda = self.parse(markup, html_name)
 
             # Get save file path for mda
             name, ext = os.path.splitext(fname)
@@ -168,21 +177,46 @@ class MDAParser(object):
                 self.empty_mdas.append(filepath)
             else:
                 with open(mdapath,'w') as fout:
-                    fout.write(parsed_mda)
+                    fout.write(str(parsed_mda))
 
-    def parse(self, markup):
+    def parse(self, markup, html_name):
         parsed_mda = ""
+        try:
+            soup = BeautifulSoup(markup,'html.parser')
+            text = soup.get_text('\n', strip=True)
 
-        soup = BeautifulSoup(markup,'html.parser')
-        text = soup.get_text('\n', strip=True)
+            text = text.replace(u'\xa0', u' ').replace(u'&nbsp;',u' ').upper()
 
-        text = text.replace(u'\xa0', u' ').replace(u'&nbsp;',u' ')
+            item14 = '\nITEM 14'
+            item7 = '\nITEM 7.'
+            item7A = '\nITEM 7A.'
+            item8 = '\nITEM 8.'
 
-        begin = text.find('Table of Contents\nItem 7.')
-        end   = text.find('Table of Contents\nItem 7A.',begin)
+            start = text.find(item14)
 
-        if end > begin:
-            parsed_mda = text[begin:end];
+            begin = text.find(item7, start)
+            if begin == -1:
+                begin = text.find('\nI\nTEM\n7.')
+                end = text.find('\nI\nTEM\n7A.')
+                if end == -1:
+                    end = text.find('\nI\nTEM\n8.')
+            else:
+                end   = text.find(item7A, begin)
+                if end == -1:
+                    end = text.find(item8)
+
+            if end > begin:
+                parsed_mda = text[begin:end];
+
+            if True or not parsed_mda:
+                foutname = html_name + '.txt'
+                print ("Writing parsed to {}".format(foutname))
+                with open(foutname,'w') as fout:
+                    fout.write(text)
+
+        except:
+            print("BeautifulSoup parsing failed {}".format(html_name + '.html'))
+
 
         return parsed_mda
 
@@ -215,8 +249,8 @@ def main():
         print("{} already exists".format(form10k_savepath))
 
     # Download 10k forms raw data
-    form = Form(form_dir=form_dir)
-    form.download(form10k_savepath=form10k_savepath)
+    #form = Form(form_dir=form_dir)
+    #form.download(form10k_savepath=form10k_savepath)
 
     # Extract MD&A
     parser = MDAParser(mda_dir=mda_dir)
