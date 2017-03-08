@@ -177,25 +177,46 @@ class MDAParser(object):
                 self.empty_mdas.append(filepath)
             else:
                 with open(mdapath,'w') as fout:
-                    fout.write(parsed_mda)
+                    fout.write(str(parsed_mda))
 
     def parse(self, markup, html_name):
         parsed_mda = ""
+        try:
+            soup = BeautifulSoup(markup,'html.parser')
+            text = soup.get_text('\n', strip=True)
 
-        soup = BeautifulSoup(markup,'html.parser')
-        text = soup.get_text('\n', strip=True)
-	
-	# Remove invalid spaces
-        text = text.replace(u'\xa0', u' ').replace(u'&nbsp;',u' ')
+            text = text.replace(u'\xa0', u' ').replace(u'&nbsp;',u' ').upper()
 
-        begin = text.find('Table of Contents\nItem 7.')
-        end   = text.find('Table of Contents\nItem 7A.',begin)
-        
-	if end == -1:
-            end = text.find('Table of Contents\nItem 8.')
+            item14 = '\nITEM 14'
+            item7 = '\nITEM 7.'
+            item7A = '\nITEM 7A.'
+            item8 = '\nITEM 8.'
 
-        if end > begin:
-            parsed_mda = text[begin:end];
+            start = text.find(item14)
+
+            begin = text.find(item7, start)
+            if begin == -1:
+                begin = text.find('\nI\nTEM\n7.')
+                end = text.find('\nI\nTEM\n7A.')
+                if end == -1:
+                    end = text.find('\nI\nTEM\n8.')
+            else:
+                end   = text.find(item7A, begin)
+                if end == -1:
+                    end = text.find(item8)
+
+            if end > begin:
+                parsed_mda = text[begin:end];
+
+            if True or not parsed_mda:
+                foutname = html_name + '.txt'
+                print ("Writing parsed to {}".format(foutname))
+                with open(foutname,'w') as fout:
+                    fout.write(text)
+
+        except:
+            print("BeautifulSoup parsing failed {}".format(html_name + '.html'))
+
 
         return parsed_mda
 
@@ -228,8 +249,8 @@ def main():
         print("{} already exists".format(form10k_savepath))
 
     # Download 10k forms raw data
-    form = Form(form_dir=form_dir)
-    form.download(form10k_savepath=form10k_savepath)
+    #form = Form(form_dir=form_dir)
+    #form.download(form10k_savepath=form10k_savepath)
 
     # Extract MD&A
     parser = MDAParser(mda_dir=mda_dir)
