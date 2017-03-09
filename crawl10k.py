@@ -153,7 +153,7 @@ class MDAParser(object):
 
         for fname in os.listdir(form_dir):
             if fname.endswith('.txt'):
-                pass
+                continue
 
             filepath = os.path.join(form_dir,fname)
             print("Parsing: {}".format(filepath))
@@ -163,8 +163,6 @@ class MDAParser(object):
 
             html_name, ext = os.path.splitext(filepath)
 
-            parsed_mda = self.parse(markup, html_name)
-
             # Get save file path for mda
             name, ext = os.path.splitext(fname)
 
@@ -172,6 +170,9 @@ class MDAParser(object):
 
             mdapath = os.path.join(self.mda_dir,mdafname)
 
+            # Start parsing
+            parsed_mda = self.parse(markup, html_name)
+            
             if not parsed_mda:
                 print("Empty mda: {}".format(mdapath))
                 self.empty_mdas.append(filepath)
@@ -180,7 +181,8 @@ class MDAParser(object):
                     with open(mdapath,'w') as fout:
                         fout.write(str(parsed_mda))
                 except:
-                    import pdb; pdb.set_trace()
+                    with codecs.open(mdapath,'w',encoding='utf-8') as fout:
+                        fout.write(parsed_mda)
 
     def parse(self, markup, html_name):
         parsed_mda = ""
