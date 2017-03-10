@@ -176,8 +176,11 @@ class MDAParser(object):
                 print("Empty mda: {}".format(mdapath))
                 self.empty_mdas.append(filepath)
             else:
-                with open(mdapath,'w') as fout:
-                    fout.write(str(parsed_mda))
+                try:
+                    with open(mdapath,'w') as fout:
+                        fout.write(str(parsed_mda))
+                except:
+                    import pdb; pdb.set_trace()
 
     def parse(self, markup, html_name):
         parsed_mda = ""
@@ -185,38 +188,44 @@ class MDAParser(object):
             soup = BeautifulSoup(markup,'html.parser')
             text = soup.get_text('\n', strip=True)
 
-            text = text.replace(u'\xa0', u' ').replace(u'&nbsp;',u' ').upper()
+            text = text.replace(u'\xa0', u' ').\
+			replace(u'&nbsp;',u' ').\
+			replace(u'\xae',u' ').\
+			replace(u'&nbsp;',u' ').\
+			replace(u"\u2019", "'").\
+			replace(u"\u201c", "\"").\
+			replace(u"\u201d", "\"").\
+			upper()
+            
+            # Write down parsed text for backtracking
+            foutname = html_name + '.txt'
+            print ("Writing html text only to {}".format(foutname))
+            with open(foutname,'w') as fout:
+                fout.write(text)
 
+            # Try to extact MDA
             item14 = '\nITEM 14'
-            item7 = '\nITEM 7.'
+            item7  = '\nITEM 7.'
             item7A = '\nITEM 7A.'
-            item8 = '\nITEM 8.'
+            item8  = '\nITEM 8.'
 
             start = text.find(item14)
-
             begin = text.find(item7, start)
             if begin == -1:
                 begin = text.find('\nI\nTEM\n7.')
-                end = text.find('\nI\nTEM\n7A.')
+                end   = text.find('\nI\nTEM\n7A.')
                 if end == -1:
                     end = text.find('\nI\nTEM\n8.')
             else:
-                end   = text.find(item7A, begin)
+                end = text.find(item7A, begin)
                 if end == -1:
                     end = text.find(item8)
 
             if end > begin:
                 parsed_mda = text[begin:end];
 
-            if True or not parsed_mda:
-                foutname = html_name + '.txt'
-                print ("Writing parsed to {}".format(foutname))
-                with open(foutname,'w') as fout:
-                    fout.write(text)
-
         except:
             print("BeautifulSoup parsing failed {}".format(html_name + '.html'))
-
 
         return parsed_mda
 
