@@ -134,102 +134,99 @@ class Form(object):
         pool.map( download_job, iter_path_generator(form10k_savepath) )
 
 class MDAParser(object):
-    def __init__(self, mda_dir):
+    def __init__(self, mda_dir, txt_dir):
         self.mda_dir    = mda_dir
         if not os.path.exists(mda_dir):
             os.makedirs(mda_dir)
 
-        self.empty_mdas = []
+        self.txt_dir    = txt_dir
+        if not os.path.exists(txt_dir):
+            os.makedirs(txt_dir)
+
+        self.parsing_failed = []
 
     def __del__(self):
         emptymda_paths = 'failed2parse.txt'
         print("Writing failed to parse files to {}".format(emptymda_paths))
 
         with open(emptymda_paths,'w') as fout:
-            for line in self.empty_mdas:
+            for line in self.parsing_failed:
                 fout.write(line + '\n')
 
     def extract_from(self, form_dir):
-
         for fname in os.listdir(form_dir):
-            if fname.endswith('.txt'):
-                continue
-
+            # Read html
+            print("Parsing: {}".format(fname))
             filepath = os.path.join(form_dir,fname)
-            print("Parsing: {}".format(filepath))
-
             with open(filepath,'rb') as fin:
                 markup = fin.read()
 
-            html_name, ext = os.path.splitext(filepath)
-
-            # Get save file path for mda
             name, ext = os.path.splitext(fname)
 
-            mdafname = name + '.mda'
+            # Parse html to text
+            text = self.parse_txt(markup, name)
 
-            mdapath = os.path.join(self.mda_dir,mdafname)
+            # Parse text to mda
+            self.parse_mda(text, name)
 
-            # Start parsing
-            parsed_mda = self.parse(markup, html_name)
-            
-            if not parsed_mda:
-                print("Empty mda: {}".format(mdapath))
-                self.empty_mdas.append(filepath)
-            else:
-                try:
-                    with open(mdapath,'w') as fout:
-                        fout.write(str(parsed_mda))
-                except:
-                    with codecs.open(mdapath,'w',encoding='utf-8') as fout:
-                        fout.write(parsed_mda)
-
-    def parse(self, markup, html_name):
-        parsed_mda = ""
+    def parse_txt(self, markup, name):
+        text = ""
         try:
-            soup = BeautifulSoup(markup,'html.parser')
-            text = soup.get_text('\n', strip=True)
-
-            text = text.replace(u'\xa0', u' ').\
-			replace(u'&nbsp;',u' ').\
-			replace(u'\xae',u' ').\
-			replace(u'&nbsp;',u' ').\
-			replace(u"\u2019", "'").\
-			replace(u"\u201c", "\"").\
-			replace(u"\u201d", "\"").\
-			upper()
-            
-            # Write down parsed text for backtracking
-            foutname = html_name + '.txt'
-            print ("Writing html text only to {}".format(foutname))
-            with open(foutname,'w') as fout:
-                fout.write(text)
-
-            # Try to extact MDA
-            item14 = '\nITEM 14'
-            item7  = '\nITEM 7.'
-            item7A = '\nITEM 7A.'
-            item8  = '\nITEM 8.'
-
-            start = text.find(item14)
-            begin = text.find(item7, start)
-            if begin == -1:
-                begin = text.find('\nI\nTEM\n7.')
-                end   = text.find('\nI\nTEM\n7A.')
-                if end == -1:
-                    end = text.find('\nI\nTEM\n8.')
-            else:
-                end = text.find(item7A, begin)
-                if end == -1:
-                    end = text.find(item8)
-
-            if end > begin:
-                parsed_mda = text[begin:end];
-
+            soup = BeautifulSoup(markup, 'html.parser')
         except:
-            print("BeautifulSoup parsing failed {}".format(html_name + '.html'))
+            print("BeautifulSoup parsing failed, skipping {}".format(name))
+            return text # empty string
 
-        return parsed_mda
+        text = soup.get_text('\n',strip=True)
+        text = text.replace(u'\xa0', u' ')\
+                .replace(u'&nbsp;',u' ')\
+                .replace(u'\xae',u' ')\
+                .replace(u'&nbsp;',u' ')\
+                .replace(u"\u2019", u"'")\
+                .replace(u"\u201c", u"\"")\
+                .replace(u"\u201d", u"\"")\
+                .upper()
+                
+        text_path = os.path.join(self.txt_dir, name + '.txt')
+        with open(text_path,'w') as fout:
+            fout.write(text)
+
+        return text
+
+    def parse_mda(self, text, name):
+        mda = ""
+        # Try to extact MDA
+        item14 = '\nITEM 14'
+        item7  = '\nITEM 7.'
+        item7A = '\nITEM 7A.'
+        item8  = '\nITEM 8.'
+
+        start = text.find(item14)
+        begin = text.find(item7, start)
+        if begin == -1:
+            begin = text.find('\nI\nTEM\n7.')
+            end   = text.find('\nI\nTEM\n7A.')
+            if end == -1:
+    	        end = text.find('\nI\nTEM\n8.')
+        else:
+    	    end = text.find(item7A, begin)
+
+        if end == -1:
+	        end = text.find(item8)
+
+        if end > begin:
+            mda = text[begin:end];
+
+        if mda: # Has value
+            # Write mda to file
+            mda_path = os.path.join(self.mda_dir, name + '.mda')
+            with open(mda_path,'w') as fout:
+                fout.write(mda)
+        else:
+            print("Failed to parse: {}".format(name))
+            self.parsing_failed.append(name + '.html')
+
+        return mda
 
 def main():
     # Download form index
@@ -238,6 +235,7 @@ def main():
     parser.add_argument('--year_end',type=int,default=2016)
     parser.add_argument('--index_dir',type=str,default='./index')
     parser.add_argument('--form_dir',type=str,default='./form')
+    parser.add_argument('--txt_dir',type=str,default='./txt')
     parser.add_argument('--mda_dir',type=str,default='./mda')
     args = parser.parse_args()
 
@@ -245,8 +243,9 @@ def main():
     year_end = args.year_end
 
     index_dir = args.index_dir
-    form_dir = args.form_dir
-    mda_dir = args.mda_dir
+    form_dir  = args.form_dir
+    txt_dir   = args.txt_dir
+    mda_dir   = args.mda_dir
 
     # Download and extract 10k form indices
     form10k_savepath = "year{}-{}.10k.csv".format(year_start,year_end)
@@ -264,7 +263,7 @@ def main():
     #form.download(form10k_savepath=form10k_savepath)
 
     # Extract MD&A
-    parser = MDAParser(mda_dir=mda_dir)
+    parser = MDAParser(mda_dir=mda_dir, txt_dir = txt_dir)
     parser.extract_from(form_dir=form_dir)
 
 if __name__ == "__main__":
