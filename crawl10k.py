@@ -3,6 +3,7 @@ import csv
 from collections import namedtuple
 from glob import glob
 from itertools import product
+from multiprocessing import Queue
 import os
 
 from bs4 import BeautifulSoup
@@ -143,39 +144,55 @@ class MDAParser(object):
         if not os.path.exists(txt_dir):
             os.makedirs(txt_dir)
 
-        self.parsing_failed = []
+    def extract_from(self, form_dir):
 
-    def __del__(self):
+        def formpath_gen(form_dir):
+            # Yields markup & name
+            for fname in os.listdir(form_dir):
+                # Read html
+                print("Parsing: {}".format(fname))
+                filepath = os.path.join(form_dir,fname)
+                with open(filepath,'rb') as fin:
+                    markup = fin.read()
+
+                name, ext = os.path.splitext(fname)
+
+                yield markup, name
+
+        def parsing_job(params):
+            markup, name = params
+            text, skip = self.parse_txt(markup, name)
+            if not skip:
+                mda = self.parse_mda(text,name)
+                return mda
+            return ""
+
+        ncpus = cpu_count()
+        pool = ProcessPool( ncpus )
+        parsing_failed = pool.map( parsing_job, \
+                                    formpath_gen(form_dir) )
+
+        # Write failed parsing list
         emptymda_paths = 'failed2parse.txt'
         print("Writing failed to parse files to {}".format(emptymda_paths))
-
-        with open(emptymda_paths,'w') as fout:
-            for line in self.parsing_failed:
-                fout.write(line + '\n')
-
-    def extract_from(self, form_dir):
-        for fname in os.listdir(form_dir):
-            # Read html
-            print("Parsing: {}".format(fname))
-            filepath = os.path.join(form_dir,fname)
-            with open(filepath,'rb') as fin:
-                markup = fin.read()
-
-            name, ext = os.path.splitext(fname)
-
-            # Parse html to text
-            text = self.parse_txt(markup, name)
-
-            # Parse text to mda
-            self.parse_mda(text, name)
+        with open(emptymda_paths,'a') as fout:
+            for line in parsing_failed:
+                if line:
+                    fout.write(line + '\n')
 
     def parse_txt(self, markup, name):
+
         text = ""
+        text_path = os.path.join(self.txt_dir, name + '.txt')
+        if os.path.exists(text_path):
+            print("{} already exists, skipping".format(text_path))
+            return "", True
+
         try:
             soup = BeautifulSoup(markup, 'html.parser')
         except:
             print("BeautifulSoup parsing failed, skipping {}".format(name))
-            return text # empty string
+            return "", False # empty string
 
         text = soup.get_text('\n',strip=True)
         text = text.replace(u'\xa0', u' ')\
@@ -186,12 +203,11 @@ class MDAParser(object):
                 .replace(u"\u201c", u"\"")\
                 .replace(u"\u201d", u"\"")\
                 .upper()
-                
-        text_path = os.path.join(self.txt_dir, name + '.txt')
+
         with open(text_path,'w') as fout:
             fout.write(text)
 
-        return text
+        return text, False
 
     def parse_mda(self, text, name):
         mda = ""
@@ -224,15 +240,14 @@ class MDAParser(object):
                 fout.write(mda)
         else:
             print("Failed to parse: {}".format(name))
-            self.parsing_failed.append(name + '.html')
-
-        return mda
+            return name + '.html'
+        return "" # Indicates parsing success
 
 def main():
     # Download form index
     parser = argparse.ArgumentParser("Edgar 10k forms sentiment analysis")
     parser.add_argument('--year_start',type=int,default=2014)
-    parser.add_argument('--year_end',type=int,default=2016)
+    parser.add_argument('--year_end',  type=int,default=2016)
     parser.add_argument('--index_dir',type=str,default='./index')
     parser.add_argument('--form_dir',type=str,default='./form')
     parser.add_argument('--txt_dir',type=str,default='./txt')
