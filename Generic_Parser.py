@@ -34,6 +34,7 @@ The program outputs:
 
 import csv
 import glob
+import os
 import re
 import string
 import sys
@@ -48,23 +49,20 @@ from tqdm import tqdm
 """
 
 # User defined directory for files to be parsed
-#TARGET_FILES = r'D:/Temp/TestParse/*.*'
-TARGET_FILES = r'./data/mda/*.mda'
+TARGET_FILES = r'./mda/*.mda'
 
 # User defined file pointer to LM dictionary
-#MASTER_DICTIONARY_FILE = r'D:/GD/Research/Natural_Language_Processing/Dictionaries/' + \
-#                         'Master/LoughranMcDonald_MasterDictionary_2014.csv'
-MASTER_DICTIONARY_FILE = r'./data/LoughranMcDonald_MasterDictionary_2014.csv'
+MASTER_DICTIONARY_FILE = r'./LoughranMcDonald_MasterDictionary_2014.csv'
 
 # User defined output file
-#OUTPUT_FILE = r'D:/Temp/Parser.csv'
-OUTPUT_FILE = r'./result/Parser.csv'
+OUTPUT_FILE = r'./result.csv'
 
 # Setup output
 OUTPUT_FIELDS = ['filename', 'file size', 'number of words', '% positive', '% negative',
                  '% uncertainty', '% litigious', '% modal-weak', '% modal moderate',
                  '% modal strong', '% constraining', '# of alphanumeric', '# of digits',
-                 '# of numbers', 'avg # of syllables per word', 'average word length', 'vocabulary']
+                 '# of numbers', 'avg # of syllables per word', 'average word length', 'vocabulary',
+                 'CIK']
 
 lm_dictionary = LM.load_masterdictionary(MASTER_DICTIONARY_FILE, True)
 
@@ -77,7 +75,6 @@ def main():
     file_list = glob.glob(TARGET_FILES)
 
     for filename in tqdm(file_list):
-        #print("Parsing {}".format(filename))
         with open(filename, 'r', encoding='UTF-8', errors='ignore') as f_in:
             doc = f_in.read()
         doc_len = len(doc)
@@ -85,20 +82,25 @@ def main():
         doc = doc.upper()  # for this parse caps aren't informative so shift
 
         output_data = get_data(doc)
+
+        fname = os.path.basename(filename)
+
+        CIK = fname.split('_')[0]
         """
             Leave only basic filename for joining meta information
         """
         #output_data[0] = filename
-        clean_filename = filename.split('/')[-1].rstrip('.mda')
-        output_data[0] = clean_filename
-        output_data[1] = doc_len
+        clean_filename  = filename.split('/')[-1].rstrip('.mda')
+        output_data[0]  = clean_filename
+        output_data[1]  = doc_len
+        output_data[-1] = CIK
         wr.writerow(output_data)
 
 
 def get_data(doc):
 
     vdictionary = {}
-    _odata = [0] * 17
+    _odata = [0] * 18 # Modified for CIK
     total_syllables = 0
     word_length = 0
 
