@@ -1,6 +1,7 @@
 import argparse
-import csv
+import codecs
 from collections import namedtuple
+import csv
 from glob import glob
 from itertools import product
 from multiprocessing import Queue
@@ -144,33 +145,33 @@ class MDAParser(object):
         if not os.path.exists(txt_dir):
             os.makedirs(txt_dir)
 
-    def extract_from(self, form_dir):
+    def extract(self):
 
-        def formpath_gen(form_dir):
+        def text_gen(txt_dir):
             # Yields markup & name
-            for fname in os.listdir(form_dir):
+            for fname in os.listdir(txt_dir):
                 # Read html
                 print("Parsing: {}".format(fname))
-                filepath = os.path.join(form_dir,fname)
-                with open(filepath,'rb') as fin:
-                    markup = fin.read()
+                filepath = os.path.join(txt_dir,fname)
+                with codecs.open(filepath,'rb',encoding='utf-8') as fin:
+                    text = fin.read()
 
                 name, ext = os.path.splitext(fname)
 
-                yield markup, name
+                yield text, name
 
         def parsing_job(params):
-            markup, name = params
-            text, skip = self.parse_txt(markup, name)
-            if not skip:
-                mda = self.parse_mda(text,name)
-                return mda
-            return ""
+            text, name = params
+            mda = self.parse_mda(text,name)
+            return mda
 
         ncpus = cpu_count()
+        if ncpus > 8:
+            ncpus = 8
+
         pool = ProcessPool( ncpus )
         parsing_failed = pool.map( parsing_job, \
-                                    formpath_gen(form_dir) )
+                                    text_gen(self.txt_dir) )
 
         # Write failed parsing list
         emptymda_paths = 'failed2parse.txt'
@@ -180,36 +181,9 @@ class MDAParser(object):
                 if line:
                     fout.write(line + '\n')
 
-    def parse_txt(self, markup, name):
-
-        text = ""
-        text_path = os.path.join(self.txt_dir, name + '.txt')
-        if os.path.exists(text_path):
-            print("{} already exists, skipping".format(text_path))
-            return "", True
-
-        try:
-            soup = BeautifulSoup(markup, 'html.parser')
-        except:
-            print("BeautifulSoup parsing failed, skipping {}".format(name))
-            return "", False # empty string
-
-        text = soup.get_text('\n',strip=True)
-        text = text.replace(u'\xa0', u' ')\
-                .replace(u'&nbsp;',u' ')\
-                .replace(u'\xae',u' ')\
-                .replace(u'&nbsp;',u' ')\
-                .replace(u"\u2019", u"'")\
-                .replace(u"\u201c", u"\"")\
-                .replace(u"\u201d", u"\"")\
-                .upper()
-
-        with open(text_path,'w') as fout:
-            fout.write(text)
-
-        return text, False
-
     def parse_mda(self, text, name):
+        text = text.upper() # Convert to upper
+
         mda = ""
         # Try to extact MDA
         item14 = '\nITEM 14'
@@ -236,7 +210,7 @@ class MDAParser(object):
         if mda: # Has value
             # Write mda to file
             mda_path = os.path.join(self.mda_dir, name + '.mda')
-            with open(mda_path,'w') as fout:
+            with codecs.open(mda_path,'w', encoding='utf-8') as fout:
                 fout.write(mda)
         else:
             print("Failed to parse: {}".format(name))
@@ -263,6 +237,7 @@ def main():
     mda_dir   = args.mda_dir
 
     # Download and extract 10k form indices
+    """
     form10k_savepath = "year{}-{}.10k.csv".format(year_start,year_end)
 
     if not os.path.exists(form10k_savepath):
@@ -272,14 +247,14 @@ def main():
         formindex.save(form10k_savepath)
     else:
         print("{} already exists".format(form10k_savepath))
-
+    """
     # Download 10k forms raw data
     #form = Form(form_dir=form_dir)
     #form.download(form10k_savepath=form10k_savepath)
 
     # Extract MD&A
     parser = MDAParser(mda_dir=mda_dir, txt_dir = txt_dir)
-    parser.extract_from(form_dir=form_dir)
+    parser.extract()
 
 if __name__ == "__main__":
     main()
