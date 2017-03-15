@@ -223,7 +223,7 @@ class MDAParser(object):
                 fout.write(mda)
         else:
             print("Failed to parse: {}".format(name))
-            return name + '.html'
+            return name + '.txt'
         return "" # Indicates parsing success
 
 def main():
