@@ -195,18 +195,25 @@ class MDAParser(object):
             for fname in os.listdir(txt_dir):
                 if not fname.endswith('.txt'):
                     continue
+                yield fname
                 # Read html
-                print("Parsing: {}".format(fname))
-                filepath = os.path.join(txt_dir,fname)
-                with codecs.open(filepath,'rb',encoding='utf-8') as fin:
-                    text = fin.read()
+                #filepath = os.path.join(txt_dir,fname)
+                #with codecs.open(filepath,'rb',encoding='utf-8') as fin:
+                #    text = fin.read()
 
-                name, ext = os.path.splitext(fname)
+                #name, ext = os.path.splitext(fname)
 
-                yield text, name
-
-        def parsing_job(params):
-            text, name = params
+                #yield text, name
+        def parsing_job(fname):
+            print("Parsing: {}".format(fname))
+            # Read text
+            filepath = os.path.join(self.txt_dir,fname)
+            with codecs.open(filepath,'rb',encoding='utf-8') as fin:
+                text = fin.read()	
+            
+            name, ext = os.path.splitext(fname)
+            # Parse MDA part
+            
             msg = ""
             mda, end = self.parse_mda(text)
             # Parse second time if first parse results in index
@@ -335,8 +342,8 @@ def main():
         print("{} already exists".format(form10k_savepath))
 
     # Download 10k forms raw data
-    form = Form(form_dir=form_dir)
-    form.download(form10k_savepath=form10k_savepath)
+    #form = Form(form_dir=form_dir)
+    #form.download(form10k_savepath=form10k_savepath)
 
     # Extract MD&A
     parser = MDAParser(mda_dir=mda_dir,
