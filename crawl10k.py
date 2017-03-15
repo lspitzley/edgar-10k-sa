@@ -19,8 +19,6 @@ FORM_INDEX_URL = os.path.join(SEC_GOV_URL,'edgar','full-index','{}','QTR{}','for
 
 IndexRecord = namedtuple("IndexRecord",["form_type","company_name","cik","date_filed","filename"])
 
-invalid_spaces = [u'\xa0',u'&nbsp;']
-
 class FormIndex(object):
     def __init__(self, index_dir):
         self.formrecords = []
@@ -101,6 +99,9 @@ class Form(object):
         self.form_dir = form_dir
         if not os.path.exists(form_dir):
             os.makedirs(form_dir)
+	self.txt_dir = './txt'
+	if not os.path.exists(self.txt_dir):
+	    os.makedirs(self.txt_dir)
 
     def download(self, form10k_savepath):
 
@@ -116,23 +117,31 @@ class Form(object):
             fname = '_'.join(url.split('/')[-2:])
 
             fname, ext = os.path.splitext(fname)
-            fname = fname + '.html'
+            htmlname = fname + '.html'
 
-            formpath = os.path.join(self.form_dir,fname)
+            formpath = os.path.join(self.form_dir,htmlname)
+            text_path = os.path.join(self.txt_dir,fname + '.txt')
 
-            if os.path.exists(formpath):
+            if os.path.exists(text_path):
                 print("Already exists, skipping {}".format(url))
             else:
-                print("Downloading {}".format(url))
+                print("Downloading & Parsing {}".format(url))
 
                 r = requests.get(url)
 
-                with open(formpath,'wb') as fout:
-                    fout.write(r.content)
+                try:
+		    soup = BeautifulSoup( r.content, "lxml")
+		    text = soup.get_text("\n").strip('\n')
+		    text_path = os.path.join(self.txt_dir,fname + '.txt')
+		    with codecs.open(text_path,'w',encoding='utf-8') as fout:
+			fout.write(text)
+		except:
+		    print("Beautiful Soup Parsing failed for {}".format(url))
 
         ncpus = cpu_count()
+        if ncpus > 8:
+            ncpus = 8
         pool = ProcessPool( ncpus )
-        #pool = ProcessPool( 8 )
         pool.map( download_job, iter_path_generator(form10k_savepath) )
 
 class MDAParser(object):
@@ -237,7 +246,6 @@ def main():
     mda_dir   = args.mda_dir
 
     # Download and extract 10k form indices
-    """
     form10k_savepath = "year{}-{}.10k.csv".format(year_start,year_end)
 
     if not os.path.exists(form10k_savepath):
@@ -247,10 +255,10 @@ def main():
         formindex.save(form10k_savepath)
     else:
         print("{} already exists".format(form10k_savepath))
-    """
+
     # Download 10k forms raw data
-    #form = Form(form_dir=form_dir)
-    #form.download(form10k_savepath=form10k_savepath)
+    form = Form(form_dir=form_dir)
+    form.download(form10k_savepath=form10k_savepath)
 
     # Extract MD&A
     parser = MDAParser(mda_dir=mda_dir, txt_dir = txt_dir)
