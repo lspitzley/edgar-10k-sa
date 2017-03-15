@@ -1,6 +1,7 @@
 import argparse
 import csv
 from collections import namedtuple
+import codecs
 from glob import glob
 from itertools import product
 from multiprocessing import Queue
@@ -100,6 +101,9 @@ class Form(object):
         self.form_dir = form_dir
         if not os.path.exists(form_dir):
             os.makedirs(form_dir)
+	self.txt_dir = './txt'
+	if not os.path.exists(self.txt_dir):
+	    os.makedirs(self.txt_dir)	
 
     def download(self, form10k_savepath):
 
@@ -115,23 +119,31 @@ class Form(object):
             fname = '_'.join(url.split('/')[-2:])
 
             fname, ext = os.path.splitext(fname)
-            fname = fname + '.html'
+            htmlname = fname + '.html'
 
-            formpath = os.path.join(self.form_dir,fname)
+            formpath = os.path.join(self.form_dir,htmlname)
+            text_path = os.path.join(self.txt_dir,fname + '.txt')
 
-            if os.path.exists(formpath):
+            if os.path.exists(text_path):
                 print("Already exists, skipping {}".format(url))
             else:
-                print("Downloading {}".format(url))
+                print("Downloading & Parsing {}".format(url))
 
                 r = requests.get(url)
-
-                with open(formpath,'wb') as fout:
-                    fout.write(r.content)
+		
+                try:
+		    soup = BeautifulSoup( r.content, "lxml")
+		    text = soup.get_text("\n").strip('\n')
+		    text_path = os.path.join(self.txt_dir,fname + '.txt')
+		    with codecs.open(text_path,'w',encoding='utf-8') as fout:
+			fout.write(text)
+		except:
+		    print("Beautiful Soup Parsing failed for {}".format(url))
 
         ncpus = cpu_count()
-        pool = ProcessPool( ncpus )
-        #pool = ProcessPool( 8 )
+        if ncpus > 8:
+	    ncpus = 8
+	pool = ProcessPool( ncpus )
         pool.map( download_job, iter_path_generator(form10k_savepath) )
 
 class MDAParser(object):
@@ -274,12 +286,12 @@ def main():
         print("{} already exists".format(form10k_savepath))
 
     # Download 10k forms raw data
-    #form = Form(form_dir=form_dir)
-    #form.download(form10k_savepath=form10k_savepath)
+    form = Form(form_dir=form_dir)
+    form.download(form10k_savepath=form10k_savepath)
 
     # Extract MD&A
-    parser = MDAParser(mda_dir=mda_dir, txt_dir = txt_dir)
-    parser.extract_from(form_dir=form_dir)
+    #parser = MDAParser(mda_dir=mda_dir, txt_dir = txt_dir)
+    #parser.extract_from(form_dir=form_dir)
 
 if __name__ == "__main__":
     main()
