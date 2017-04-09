@@ -55,7 +55,7 @@ TARGET_FILES = r'./mda/*.mda'
 MASTER_DICTIONARY_FILE = r'./LoughranMcDonald_MasterDictionary_2014.csv'
 
 # User defined output file
-OUTPUT_FILE = r'./result.csv'
+OUTPUT_FILE = r'./result2014-2016.csv'
 
 # Setup output
 OUTPUT_FIELDS = ['filename', 'file size', 'number of words', '% positive', '% negative',

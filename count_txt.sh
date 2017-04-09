@@ -1,9 +1,9 @@
 #!/bin/bash
 
-nform=$(ls form | wc -l)
-ntext=$(ls txt | wc -l)
+nform=$(ls txt | wc -l)
+ntext=$(ls mda | wc -l)
 while true; do 
+	ntext=$(ls mda | wc -l)
 	echo "Text file progress: $ntext/$nform"
-	ntext=$(ls txt | wc -l)
-	sleep 300
+	sleep 5
 done

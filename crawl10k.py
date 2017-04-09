@@ -196,14 +196,8 @@ class MDAParser(object):
                 if not fname.endswith('.txt'):
                     continue
                 yield fname
-                # Read html
-                #filepath = os.path.join(txt_dir,fname)
-                #with codecs.open(filepath,'rb',encoding='utf-8') as fin:
-                #    text = fin.read()
+        
 
-                #name, ext = os.path.splitext(fname)
-
-                #yield text, name
         def parsing_job(fname):
             print("Parsing: {}".format(fname))
             # Read text
