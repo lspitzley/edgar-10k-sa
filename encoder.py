@@ -141,7 +141,9 @@ class Model(object):
         M = tf.placeholder(tf.float32, [None, hps.nsteps, 1])
         S = tf.placeholder(tf.float32, [hps.nstates, None, hps.nhidden])
         cells, states, logits = model(X, S, M, reuse=False)
-
+    
+        #gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
+        #sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
         sess = tf.Session()
         tf.global_variables_initializer().run(session=sess)
 
@@ -180,8 +182,8 @@ class Model(object):
                         smb[:, offset+start:offset+end, :])
                     smb[:, offset+start:offset+end, :] = batch_smb
             features = smb[0, unsort_idxs, :]
-            print('%0.3f seconds to transform %d examples' %
-                  (time.time() - tstart, n))
+            #print('%0.3f seconds to transform %d examples' %
+            #      (time.time() - tstart, n))
             return features
 
         def cell_transform(xs, indexes=None):
