@@ -7,39 +7,33 @@ from tqdm import tqdm
 
 from encoder import Model
 
-if __name__ == "__main__":
+model = Model()
 
-    model = Model()
-    mda_dir = './mda'
-    outfile = 'gen_review_feature.csv'
+mda_dir = './1996_2013mda'
+outfile = 'gen_review_feature_paragraph_1993-2013.csv'
 
-    batch_size = 1024
-    mda_files = glob(os.path.join(mda_dir,'*.mda'))
-    # Filter 2010-2015 files    
-    #mda_files = list(filter(lambda x: int(x.split('-')[1]) in range(10,16), mda_files))
-    
-    def iter_batch(lines, batch_size=256):
-        # Filter empty lines
-        lines = list(filter(lambda x: x.strip(), lines))
-        for idx in range(0, len(lines), batch_size):
-            yield lines[idx:idx+batch_size]
+batch_size = 1024
+mda_files = glob(os.path.join(mda_dir,'*.mda'))
+# Filter 2010-2015 files    
 
-
-    with open(outfile,'w') as fout:
-        writer = csv.writer(fout,delimiter=',')
-        writer.writerow(['mda', 'paragraph'] + list(range(4096)))
-        for mda_file in tqdm(mda_files):
-
-            with open(mda_file,'r',encoding='utf-8') as fin:
+def iter_file(mda_files, batch_size=256):
+    for idx in range(0,len(mda_files),batch_size):
+        text_list = []
+        for b in range(batch_size):
+            if idx + b == len(mda_files):
+                break
+            with open(mda_files[idx+b],'r') as fin:
                 text = fin.read()
+            text_list.append(text)
+        yield mda_files[idx:idx+batch_size], text_list
 
-            count = 0
-            for lines in tqdm(list(iter_batch(text.split('\n\n'), batch_size))):
+with open(outfile,'w') as fout:
+    writer = csv.writer(fout,delimiter=',')
+    writer.writerow(['mda','2388'])
+    for mda_names, text_list in tqdm(iter_file(mda_files,batch_size)):
 
-                features = model.transform(lines)
-                
-                list_feature = features.tolist()
-                for feat in list_feature:
-                    row = [ mda_file, count ] + feat
-                    writer.writerow(row)
-                    count += 1
+        features = model.transform(text_list)
+        list_feature = features[:,2388].tolist()
+        for mda_name, feat in zip(mda_names, list_feature):
+            row = [ mda_name, feat ] 
+            writer.writerow(row)
