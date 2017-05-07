@@ -11,7 +11,7 @@ from pathos.pools import ProcessPool
 from pathos.helpers import cpu_count
 import requests
 
-SEC_GOV_URL = 'http://www.sec.gov/Archives'
+SEC_GOV_URL = 'https://www.sec.gov/Archives'
 
 class Form10k(object):
     def __init__(self, txt_dir):
@@ -61,7 +61,7 @@ class Form10k(object):
                 reader = csv.reader(fin,delimiter=',',quotechar='\"',quoting=csv.QUOTE_ALL)
                 for row in reader:
                     form_type, company_name, cik, date_filed, filename = row
-                    url = os.path.join(SEC_GOV_URL,filename)
+                    url = os.path.join(SEC_GOV_URL,filename).replace("\\","/")
                     yield url
 
         def download_job(url):
